@@ -41,7 +41,7 @@ const jamendoSearchController = async (req, res) => {
             client_id: JAMENDO_CLIENT_ID,
             format: 'json',
             name: artist,
-            limit: 5,
+            limit: 50,
             audioformat: 'mp32',
             order: 'popularity_total',
             include: 'musicinfo'
@@ -50,7 +50,7 @@ const jamendoSearchController = async (req, res) => {
         params = {
             client_id: JAMENDO_CLIENT_ID,
             format: 'json',
-            limit: 5,
+            limit: 50,
             audioformat: 'mp32',
             order: 'popularity_total',
             include: 'musicinfo'
@@ -79,5 +79,36 @@ const jamendoSearchController = async (req, res) => {
     }
 };
 
+const jamendoArtistsController = async (req, res) => {
+    const url = 'https://api.jamendo.com/v3.0/artists';
+    const params = {
+        client_id: JAMENDO_CLIENT_ID,
+        format: 'json',
+        order: 'popularity_month',
+        limit: 20, // how many artists you want
+        imagesize: 500 // you can change image size
+    };
 
-export default { musicController, jamendoSearchController };
+    try {
+        const response = await axios.get(url, { params });
+        const results = response.data.results;
+
+        const formatted = results.filter(artist => artist.image && artist.image.trim() !== '').map(artist => ({
+            id: artist.id,
+            name: artist.name,
+            image: artist.image,
+            joindate: artist.joindate,
+            shareurl: artist.shareurl
+        }));
+        console.log(formatted);
+
+        res.json(formatted);
+    } catch (error) {
+        console.error('Jamendo API error:', error.message);
+        res.status(500).json({ error: 'Failed to fetch artists from Jamendo' });
+    }
+};
+
+
+
+export default { musicController, jamendoSearchController, jamendoArtistsController };
