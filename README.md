@@ -36,15 +36,6 @@ Currently integrates with the **Jamendo API** to fetch music tracks, and will so
 
 2. Example responce coming from the api
 
-  {
-      "id": "1204669",
-      "name": "What Is Love",
-      "artist": "Melanie Ungar",
-      "album": "What Is Love",
-      "audio": "https://prod-1.storage.jamendo.com/?trackid=1204669&format=mp32&from=kPWpcG%2F9SDBv2UkHGmUIlA%3D%3D%7Ckwg9Di0tmucSjPc1XxiQlA%3D%3D",
-      "duration": 212,
-      "image": "https://usercontent.jamendo.com?type=album&id=144705&width=300&trackid=1204669"
-  }
 <img width="1910" height="1073" alt="image" src="https://github.com/user-attachments/assets/11b8747f-07b7-4a7f-9be1-f0c7646abfb2" />
 
 
