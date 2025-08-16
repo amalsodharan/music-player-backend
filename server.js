@@ -4,11 +4,14 @@ import dotenv from 'dotenv';
 import multer from 'multer';
 import musicControllers from './controllers/musicController.js';
 import localMusic from './controllers/localMusic.js';
+import path from 'path';
 
 const app = express();
 dotenv.config();
 app.use(cors());
 app.use(express.json());
+
+app.use("/cdn", express.static(path.join(process.cwd(), "cdn")));
 
 const PORT = process.env.PORT;
 
