@@ -62,7 +62,8 @@ const jamendoSearchController = async (req, res) => {
         const response = await axios.get(url, { params });
         const results = response.data.results;
 
-        const formatted = results.map(track => ({
+        const formatted = results.map((track, index) => ({
+            index: index + 1,
             id: track.id,
             name: track.name,
             artist: track.artist_name,
@@ -85,8 +86,8 @@ const jamendoArtistsController = async (req, res) => {
         client_id: JAMENDO_CLIENT_ID,
         format: 'json',
         order: 'popularity_month',
-        limit: 20, // how many artists you want
-        imagesize: 500 // you can change image size
+        limit: 50,
+        imagesize: 500
     };
 
     try {
