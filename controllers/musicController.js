@@ -1,5 +1,7 @@
 import axios from 'axios';
 import dotenv from 'dotenv';
+import initDb from '../db.js';
+import { raw } from 'mysql2';
 
 dotenv.config();
 
@@ -41,7 +43,7 @@ const jamendoSearchController = async (req, res) => {
             client_id: JAMENDO_CLIENT_ID,
             format: 'json',
             name: artist,
-            limit: 50,
+            limit: 200,
             audioformat: 'mp32',
             order: 'popularity_total',
             include: 'musicinfo'
@@ -50,7 +52,7 @@ const jamendoSearchController = async (req, res) => {
         params = {
             client_id: JAMENDO_CLIENT_ID,
             format: 'json',
-            limit: 50,
+            limit: 200,
             audioformat: 'mp32',
             order: 'popularity_total',
             include: 'musicinfo'
@@ -110,6 +112,102 @@ const jamendoArtistsController = async (req, res) => {
     }
 };
 
+const storeJamedoController = async (req, res) => {
+    const { Music } = await initDb();
+
+    const input = req.body;
+    console.log(input);
+    let artist, params;
+    if(input){
+        artist = input.name;
+    }
+    const url = 'https://api.jamendo.com/v3.0/tracks';
+    if (artist) {
+        params = {
+            client_id: JAMENDO_CLIENT_ID,
+            format: 'json',
+            name: artist,
+            limit: 200,
+            audioformat: 'mp32',
+            order: 'popularity_total',
+            include: 'musicinfo'
+        };
+    }else {
+        params = {
+            client_id: JAMENDO_CLIENT_ID,
+            format: 'json',
+            limit: 200,
+            audioformat: 'mp32',
+            order: 'artist_name',
+            include: 'musicinfo'
+        };
+    }
+    console.log(params);
+
+    try {
+        const response = await axios.get(url, { params });
+        const results = response.data.results;
+
+        const formatted = results.map((track, index) => ({
+            index: index + 1,
+            music_id: track.id,
+            name: track.name,
+            artist: track.artist_name,
+            album: track.album_name,
+            audio: track.audio,
+            duration: track.duration,
+            image: track.album_image,
+            is_deleted: false
+        }));
+
+        formatted.forEach(async element => {
+            const musicFetch = await Music.findOne({ where: { music_id : element.music_id } });
+            if(!musicFetch){
+                const musicCreate = await Music.create(element);
+                if(musicCreate) console.log(`${element.music_id} created`);
+            }else{
+                console.log(`${element.music_id} already exists`);
+            }
+        });
+
+        res.json(formatted);
+    } catch (error) {
+        console.error('Jamendo API error:', error.message);
+        res.status(500).json({ error: 'Failed to fetch tracks from Jamendo' });
+    }
+};
+
+const getLocalMusic = async (req, res) => {
+    try {
+        const { Music, Op } = await initDb();
+        let limit = parseInt(req.query.lt) || 50;
+        const search = req.query.search || '';
+        let whereClause;
+        if(search){
+            limit = 10;
+            whereClause = {
+                is_deleted: false,
+                name: {
+                    [Op.like] : `%${search}%`
+                }
+            }
+        }else{
+            whereClause = { is_deleted: false };
+        }
+        const fetchMusic = await Music.findAll({ where: whereClause, limit: limit });
+
+        if(fetchMusic.length === 0) res.message({ status: 'Success', message: 'No Record found' });
+
+        res.status(200).json({
+            status: 'Success', 
+            message: `Total ${fetchMusic.length} records fetched`, 
+            data: fetchMusic 
+        });
+    } catch (error) {
+        console.error('Error fetching local music', error.message);
+        res.status(500).json({ error: 'Failed to fetch local data' });
+    }
+};
 
 
-export default { musicController, jamendoSearchController, jamendoArtistsController };
+export default { musicController, jamendoSearchController, jamendoArtistsController, storeJamedoController, getLocalMusic };

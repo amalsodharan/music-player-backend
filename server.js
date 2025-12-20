@@ -24,6 +24,8 @@ app.get('/', (req, res) => {
 app.get('/search/lastfm', musicControllers.musicController);
 app.get('/search/jamendo', musicControllers.jamendoSearchController);
 app.get('/artist/jamendo', musicControllers.jamendoArtistsController);
+app.post('/add/jamendo', musicControllers.storeJamedoController);
+app.get('/api/getMusic', musicControllers.getLocalMusic);
 
 app.post('/api/add', upload.any(), localMusic.addMusic);
 
