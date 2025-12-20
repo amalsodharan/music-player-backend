@@ -1,7 +1,7 @@
 import axios from 'axios';
 import dotenv from 'dotenv';
 import initDb from '../db.js';
-import { raw } from 'mysql2';
+import { QueryTypes } from 'sequelize';
 
 dotenv.config();
 
@@ -209,5 +209,47 @@ const getLocalMusic = async (req, res) => {
     }
 };
 
+const getArtistData = async (req, res) => {
+    try {
+        const { Music, Op } = await initDb();
+        const search = req.query.search || "";
 
-export default { musicController, jamendoSearchController, jamendoArtistsController, storeJamedoController, getLocalMusic };
+        const whereCondition = search ? { artist: { [Op.like]: `%${search}%` } } : {};
+
+        const tracks = await Music.findAll({
+            where: whereCondition,
+            order: [["artist", "DESC"]],
+            raw: true
+        });
+
+        if (!tracks.length) {
+            return res.json({ status: "Failed", message: "No artists found" });
+        }
+
+        const artistMap = {};
+
+        for (const track of tracks) {
+            if (!artistMap[track.artist]) {
+                artistMap[track.artist] = {
+                    artist: track.artist,
+                    count: 0,
+                    tracks: []
+                };
+            }
+            artistMap[track.artist].count++;
+            artistMap[track.artist].tracks.push(track);
+        }
+
+        const result = Object.values(artistMap).filter(a => a.count > 1);
+
+        return res.status(200).json({
+            status: "Success",
+            data: result
+        });
+    } catch (error) {
+        console.error('Temp script error:', error.message);
+        res.status(500).json({ status: 'Failed', message: 'Temp script failed' });
+    }
+}
+
+export default { musicController, jamendoSearchController, jamendoArtistsController, storeJamedoController, getLocalMusic, getArtistData };

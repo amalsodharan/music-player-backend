@@ -21,12 +21,17 @@ app.get('/', (req, res) => {
     res.send("This is a Sample API");
 });
 
+//live api data
 app.get('/search/lastfm', musicControllers.musicController);
 app.get('/search/jamendo', musicControllers.jamendoSearchController);
 app.get('/artist/jamendo', musicControllers.jamendoArtistsController);
+
+//local db music data
 app.post('/add/jamendo', musicControllers.storeJamedoController);
 app.get('/api/getMusic', musicControllers.getLocalMusic);
+app.get('/api/getArtist', musicControllers.getArtistData);
 
+//upload local music
 app.post('/api/add', upload.any(), localMusic.addMusic);
 
 app.listen(PORT, (req, res) => {
