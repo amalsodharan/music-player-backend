@@ -115,8 +115,9 @@ const jamendoArtistsController = async (req, res) => {
 const storeJamedoController = async (req, res) => {
     const { Music } = await initDb();
 
+    const order_type = req.query.order_type || 'popularity_total';
+    const limit = parseInt(req.query.limit) || 200;
     const input = req.body;
-    console.log(input);
     let artist, params;
     if(input){
         artist = input.name;
@@ -127,18 +128,18 @@ const storeJamedoController = async (req, res) => {
             client_id: JAMENDO_CLIENT_ID,
             format: 'json',
             name: artist,
-            limit: 200,
+            limit: limit,
             audioformat: 'mp32',
-            order: 'popularity_total',
+            order: order_type,
             include: 'musicinfo'
         };
     }else {
         params = {
             client_id: JAMENDO_CLIENT_ID,
             format: 'json',
-            limit: 200,
+            limit: limit,
             audioformat: 'mp32',
-            order: 'artist_name',
+            order: order_type,
             include: 'musicinfo'
         };
     }

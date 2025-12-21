@@ -26,6 +26,10 @@ export default (sequelize, Sequelize) => {
       type: Sequelize.STRING,
       allowNull: false,
     },
+    image: {
+      type: Sequelize.STRING,
+      allowNull: false,
+    },
     duration: {
       type: Sequelize.INTEGER,
       allowNull: false,
