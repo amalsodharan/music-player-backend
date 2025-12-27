@@ -3,6 +3,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import multer from 'multer';
 import musicControllers from './controllers/musicController.js';
+import userControllers from './controllers/userController.js';
 import localMusic from './controllers/localMusic.js';
 import path from 'path';
 
@@ -30,6 +31,9 @@ app.get('/artist/jamendo', musicControllers.jamendoArtistsController);
 app.post('/add/jamendo', musicControllers.storeJamedoController);
 app.get('/api/getMusic', musicControllers.getLocalMusic);
 app.get('/api/getArtist', musicControllers.getArtistData);
+
+//user controllers
+app.post('/api/createUser', userControllers.createUser);
 
 //upload local music
 app.post('/api/add', upload.any(), localMusic.addMusic);

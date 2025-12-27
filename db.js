@@ -1,6 +1,7 @@
 import { Sequelize, Op } from 'sequelize';
 import dotenv from 'dotenv';
 import musicModel from './modules/musicModel.js';
+import userModel from './modules/userModule.js';
 
 dotenv.config();
 
@@ -18,8 +19,9 @@ const sequelize = new Sequelize(
 );
 
 const Music = musicModel(sequelize, Sequelize);
+const User = userModel(sequelize, Sequelize);
 
-const Models = { Music, Op };
+const Models = { Music, User, Op };
 
 const connection = {};
 
