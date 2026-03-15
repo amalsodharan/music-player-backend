@@ -1,5 +1,5 @@
 export default (sequelize, Sequelize) => {
-  return sequelize.define('User', {
+  return sequelize.define('User_v3', {
     id: {
       type: Sequelize.UUID,
       defaultValue: Sequelize.UUIDV4,
