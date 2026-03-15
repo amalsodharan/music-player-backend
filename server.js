@@ -5,6 +5,7 @@ import multer from 'multer';
 import musicControllers from './controllers/musicController.js';
 import userControllers from './controllers/userController.js';
 import localMusic from './controllers/localMusic.js';
+import authenticateToken from './middleware/Auth.js';
 import path from 'path';
 
 const app = express();
@@ -28,12 +29,13 @@ app.get('/search/jamendo', musicControllers.jamendoSearchController);
 app.get('/artist/jamendo', musicControllers.jamendoArtistsController);
 
 //local db music data
-app.post('/add/jamendo', musicControllers.storeJamedoController);
-app.get('/api/getMusic', musicControllers.getLocalMusic);
-app.get('/api/getArtist', musicControllers.getArtistData);
+app.post('/add/jamendo', authenticateToken, musicControllers.storeJamedoController);
+app.get('/api/getMusic', authenticateToken, musicControllers.getLocalMusic);
+app.get('/api/getArtist', authenticateToken, musicControllers.getArtistData);
 
 //user controllers
 app.post('/api/createUser', userControllers.createUser);
+app.post('/api/login', userControllers.loginUser);
 
 //upload local music
 app.post('/api/add', upload.any(), localMusic.addMusic);

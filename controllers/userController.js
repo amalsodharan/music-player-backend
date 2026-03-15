@@ -39,7 +39,7 @@ const createUser = async (req, res) => {
                 email: user.email
             },
             process.env.JWT_SECRET,
-            { expiresIn: '7d' }
+            { expiresIn: '30d' }
         )
         res.status(201).json({ status: 'Success', message: 'User created successfully', token: token });
     } catch (error) {
@@ -48,4 +48,28 @@ const createUser = async (req, res) => {
     }
 };
 
-export default { createUser };
+const loginUser = async (req, res) => {
+    try {
+        const { User } = await initDb();
+        let { email, password } = req.body;
+        if(!email || !password){
+            res.status(400).json({ status: 'Failed', message: 'All fields are required' });
+        }
+        const fetchUser = await User.findOne({ where: { email : email } });
+        if(!fetchUser) res.status(400).json({ status: 'Failed', message: 'No User Found' });
+
+        const isMatch = await bcrypt.compare(password, fetchUser.password);
+        if (!isMatch) return res.status(400).json({ message: 'wrong password' });
+        const token = jwt.sign(
+            { id: fetchUser.id, role: fetchUser.role, email: fetchUser.email },
+            process.env.JWT_SECRET,
+            { expiresIn: '30d' }
+        );
+        res.status(201).json({ message: 'login successfull!', token: `JWT ${token}` });
+    }catch (error) {
+        console.error(error);
+        res.status(500).json({ Status: 'Failed', message: `Some error occured due to ${error}` });
+    }
+}
+
+export default { createUser, loginUser };
