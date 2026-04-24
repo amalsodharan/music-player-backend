@@ -6,6 +6,7 @@ import musicControllers from './controllers/musicController.js';
 import userControllers from './controllers/userController.js';
 import localMusic from './controllers/localMusic.js';
 import viTunesController from './controllers/viTunesController.js';
+import saavnController from './controllers/saavnController.js';
 import authenticateToken from './middleware/Auth.js';
 import path from 'path';
 
@@ -54,6 +55,10 @@ app.get('/api/viTune/playlist/:id', viTunesController.getPlaylist);
 app.get('/api/viTune/lyrics/:id', viTunesController.getLyrics);
 app.get('/api/viTune/streamUrl/:id', viTunesController.getStreamUrl);
 app.get('/api/viTune/stream/:id', viTunesController.stream);
+
+// JioSaavn Controllers — Robust alternative for live streaming
+app.get('/api/saavn/search', saavnController.search);
+app.get('/api/saavn/streamUrl/:id', saavnController.getStreamUrl);
 
 app.listen(PORT, (req, res) => {
     console.log(`Server is running on ${PORT}`);
