@@ -24,6 +24,7 @@
     "play-dl": "^1.9.7",
     "sequelize": "^6.37.7",
     "youtube-dl-exec": "^3.1.5",
+    "youtube-ext": "^1.1.25",
     "youtubei.js": "^17.0.1",
     "yt-stream": "^1.7.4",
     "ytmusic-api": "^5.3.1"
