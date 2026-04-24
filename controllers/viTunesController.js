@@ -175,7 +175,7 @@ const getStreamUrl = async (req, res) => {
             noCheckCertificates: true,
             noWarnings: true,
             preferFreeFormats: true,
-            extractorArgs: 'youtube:player_client=ios,android_vr',
+            extractorArgs: 'youtube:player_client=tvhtml5',
             addHeader: [
                 'referer:https://www.youtube.com/',
                 'user-agent:Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
@@ -230,7 +230,7 @@ const stream = async (req, res) => {
             format: 'bestaudio',
             noCheckCertificates: true,
             noWarnings: true,
-            extractorArgs: 'youtube:player_client=ios,android_vr',
+            extractorArgs: 'youtube:player_client=tvhtml5',
             addHeader: [
                 'referer:https://www.youtube.com/',
                 'user-agent:Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
