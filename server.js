@@ -5,6 +5,7 @@ import multer from 'multer';
 import musicControllers from './controllers/musicController.js';
 import userControllers from './controllers/userController.js';
 import localMusic from './controllers/localMusic.js';
+import viTunesController from './controllers/viTunesController.js';
 import authenticateToken from './middleware/Auth.js';
 import path from 'path';
 
@@ -36,9 +37,23 @@ app.get('/api/getArtist', authenticateToken, musicControllers.getArtistData);
 //user controllers
 app.post('/api/createUser', userControllers.createUser);
 app.post('/api/login', userControllers.loginUser);
+app.get('/api/me', authenticateToken, userControllers.getMe);
+app.put('/api/updateUser', authenticateToken, userControllers.updateUser);
+app.delete('/api/deleteUser', authenticateToken, userControllers.deleteUser);
 
 //upload local music
 app.post('/api/add', upload.any(), localMusic.addMusic);
+
+//viTunes controllers — YouTube Music (Innertube) live API
+app.get('/api/viTune/search', viTunesController.search);
+app.get('/api/viTune/suggestions', viTunesController.getSuggestions);
+app.get('/api/viTune/song/:id', viTunesController.getSong);
+app.get('/api/viTune/artist/:id', viTunesController.getArtist);
+app.get('/api/viTune/album/:id', viTunesController.getAlbum);
+app.get('/api/viTune/playlist/:id', viTunesController.getPlaylist);
+app.get('/api/viTune/lyrics/:id', viTunesController.getLyrics);
+app.get('/api/viTune/streamUrl/:id', viTunesController.getStreamUrl);
+app.get('/api/viTune/stream/:id', viTunesController.stream);
 
 app.listen(PORT, (req, res) => {
     console.log(`Server is running on ${PORT}`);

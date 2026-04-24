@@ -72,4 +72,79 @@ const loginUser = async (req, res) => {
     }
 }
 
-export default { createUser, loginUser };
+const getMe = async (req, res) => {
+    try {
+        const { User } = await initDb();
+        const userId = req.user.id;
+
+        const user = await User.findOne({
+            where: { id: userId, is_deleted: false },
+            attributes: { exclude: ['password'] }
+        });
+
+        if (!user) {
+            return res.status(404).json({ status: 'Failed', message: 'User not found' });
+        }
+
+        res.status(200).json({ status: 'Success', data: user });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ status: 'Failed', message: `Error fetching user: ${error}` });
+    }
+};
+
+const updateUser = async (req, res) => {
+    try {
+        const { User } = await initDb();
+        const userId = req.user.id;
+        const { first_name, last_name, phone, email } = req.body;
+
+        const user = await User.findOne({ where: { id: userId, is_deleted: false } });
+        if (!user) {
+            return res.status(404).json({ status: 'Failed', message: 'User not found' });
+        }
+
+        const updates = {};
+        if (first_name !== undefined) updates.first_name = first_name;
+        if (last_name !== undefined) updates.last_name = last_name;
+        if (phone !== undefined) updates.phone = phone;
+        if (email !== undefined) updates.email = email;
+
+        if (Object.keys(updates).length === 0) {
+            return res.status(400).json({ status: 'Failed', message: 'No fields to update' });
+        }
+
+        await User.update(updates, { where: { id: userId } });
+
+        const updatedUser = await User.findOne({
+            where: { id: userId },
+            attributes: { exclude: ['password'] }
+        });
+
+        res.status(200).json({ status: 'Success', message: 'User updated successfully', data: updatedUser });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ status: 'Failed', message: `Error updating user: ${error}` });
+    }
+};
+
+const deleteUser = async (req, res) => {
+    try {
+        const { User } = await initDb();
+        const userId = req.user.id;
+
+        const user = await User.findOne({ where: { id: userId, is_deleted: false } });
+        if (!user) {
+            return res.status(404).json({ status: 'Failed', message: 'User not found or already deleted' });
+        }
+
+        await User.update({ is_deleted: true }, { where: { id: userId } });
+
+        res.status(200).json({ status: 'Success', message: 'User deleted successfully' });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ status: 'Failed', message: `Error deleting user: ${error}` });
+    }
+};
+
+export default { createUser, loginUser, getMe, updateUser, deleteUser };
