@@ -175,7 +175,11 @@ const getStreamUrl = async (req, res) => {
             noCheckCertificates: true,
             noWarnings: true,
             preferFreeFormats: true,
-            addHeader: ['referer:youtube.com', 'user-agent:googlebot']
+            extractorArgs: 'youtube:player_client=ios,android_vr',
+            addHeader: [
+                'referer:https://www.youtube.com/',
+                'user-agent:Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+            ]
         });
 
         // Find best audio-only format
@@ -226,7 +230,11 @@ const stream = async (req, res) => {
             format: 'bestaudio',
             noCheckCertificates: true,
             noWarnings: true,
-            addHeader: ['referer:youtube.com', 'user-agent:googlebot']
+            extractorArgs: 'youtube:player_client=ios,android_vr',
+            addHeader: [
+                'referer:https://www.youtube.com/',
+                'user-agent:Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+            ]
         });
 
         subprocess.stdout.pipe(res);
