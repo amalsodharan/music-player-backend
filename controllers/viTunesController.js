@@ -42,7 +42,8 @@ const getYouTube = async () => {
     if (!youtube) {
         youtube = await Innertube.create({
             cache: new UniversalCache(false),
-            generate_session_locally: true
+            generate_session_locally: true,
+            cookie: process.env.YOUTUBE_COOKIE || ''
         });
     }
     return youtube;
