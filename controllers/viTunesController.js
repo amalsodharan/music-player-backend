@@ -1,5 +1,5 @@
 import YTMusic from 'ytmusic-api';
-import youtubedl from 'youtube-dl-exec';
+import { Innertube, UniversalCache } from 'youtubei.js';
 import axios from 'axios';
 
 // ─── Piped Instances (Fallback for blacklisted IPs like Render) ──────────────
@@ -36,6 +36,17 @@ async function getPipedStream(videoId) {
 
 // Singleton – initialise once, reuse across requests
 let ytmusic = null;
+let youtube = null;
+
+const getYouTube = async () => {
+    if (!youtube) {
+        youtube = await Innertube.create({
+            cache: new UniversalCache(false),
+            generate_session_locally: true
+        });
+    }
+    return youtube;
+};
 
 async function getClient() {
     if (!ytmusic) {
@@ -200,44 +211,33 @@ const getStreamUrl = async (req, res) => {
             return res.status(400).json({ status: 'Failed', message: 'Video id is required' });
         }
 
-        const url = `https://www.youtube.com/watch?v=${id}`;
-        
         try {
-            // Try youtube-dl-exec first
-            const output = await youtubedl(url, {
-                dumpSingleJson: true,
-                noCheckCertificates: true,
-                noWarnings: true,
-                preferFreeFormats: true,
-                extractorArgs: 'youtube:player_client=tvhtml5',
-                addHeader: [
-                    'referer:https://www.youtube.com/',
-                    'user-agent:Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-                ]
-            });
+            const yt = await getYouTube();
+            // Use the TV client as it's the most reliable on cloud IPs
+            const info = await yt.getInfo(id, 'TVHTML5');
+            
+            const format = info.chooseFormat({ type: 'audio', quality: 'best' });
+            
+            if (format) {
+                // TV formats often don't need deciphering, or are easily handled
+                const audioUrl = format.decipher(yt.session.player);
 
-            const audioFormat = output.formats
-                .filter(f => f.vcodec === 'none')
-                .sort((a, b) => (b.abr || 0) - (a.abr || 0))[0];
-
-            if (audioFormat && audioFormat.url) {
                 return res.status(200).json({
                     status: 'Success',
-                    source: 'youtube',
                     data: {
                         videoId: id,
-                        title: output.title,
-                        author: output.uploader,
-                        duration: output.duration,
-                        thumbnail: output.thumbnail,
-                        audioUrl: audioFormat.url,
-                        mimeType: audioFormat.ext === 'webm' ? 'audio/webm' : 'audio/mpeg',
+                        title: info.basic_info.title,
+                        author: info.basic_info.author,
+                        duration: info.basic_info.duration,
+                        thumbnail: info.basic_info.thumbnail?.[0]?.url,
+                        audioUrl: audioUrl,
+                        mimeType: format.mime_type,
                         expiresIn: 3600
                     }
                 });
             }
         } catch (error) {
-            console.warn('Primary YouTube fetch failed, trying Piped fallback...', error.message);
+            console.warn('Primary YouTubei fetch failed, trying Piped fallback...', error.message);
         }
 
         // FALLBACK: Try Piped Instances
@@ -259,7 +259,7 @@ const getStreamUrl = async (req, res) => {
             });
         }
 
-        res.status(500).json({ status: 'Failed', message: 'Failed to get stream URL from all sources (YouTube & Piped)' });
+        res.status(500).json({ status: 'Failed', message: 'Failed to get stream URL from all sources' });
     } catch (error) {
         console.error('ViTune getStreamUrl error:', error.message);
         res.status(500).json({ status: 'Failed', message: `Critical error: ${error.message}` });
@@ -274,40 +274,37 @@ const stream = async (req, res) => {
             return res.status(400).json({ status: 'Failed', message: 'Video id is required' });
         }
 
-        const url = `https://www.youtube.com/watch?v=${id}`;
-        
         try {
-            // Set headers for audio
-            res.setHeader('Content-Type', 'audio/mpeg');
-            res.setHeader('Accept-Ranges', 'bytes');
+            const yt = await getYouTube();
+            const info = await yt.getInfo(id, 'TVHTML5');
+            const format = info.chooseFormat({ type: 'audio', quality: 'best' });
 
-            // Use youtube-dl-exec to stream directly
-            const subprocess = youtubedl.exec(url, {
-                output: '-',
-                format: 'bestaudio',
-                noCheckCertificates: true,
-                noWarnings: true,
-                extractorArgs: 'youtube:player_client=tvhtml5',
-                addHeader: [
-                    'referer:https://www.youtube.com/',
-                    'user-agent:Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-                ]
-            });
+            if (format) {
+                const stream = await info.download({
+                    type: 'audio',
+                    quality: 'best',
+                    client: 'TVHTML5'
+                });
 
-            subprocess.stdout.pipe(res);
+                res.setHeader('Content-Type', format.mime_type || 'audio/mpeg');
+                res.setHeader('Accept-Ranges', 'bytes');
 
-            subprocess.on('error', (err) => {
-                console.error('Stream error:', err.message);
-            });
-
-            // Ensure process is killed if request is aborted
-            req.on('close', () => {
-                subprocess.kill();
-            });
-
-            return; // Successfully started streaming
+                // Convert web stream to node stream if necessary
+                const reader = stream.getReader();
+                const pump = async () => {
+                    const { done, value } = await reader.read();
+                    if (done) {
+                        res.end();
+                        return;
+                    }
+                    res.write(value);
+                    await pump();
+                };
+                await pump();
+                return;
+            }
         } catch (error) {
-            console.warn('Direct stream failed, trying Piped fallback...');
+            console.warn('Direct YouTubei stream failed, trying Piped fallback...', error.message);
         }
 
         // FALLBACK: Stream via Piped
