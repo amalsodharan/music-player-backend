@@ -1,4 +1,5 @@
 import { Sequelize, Op } from 'sequelize';
+import mysql2 from 'mysql2';
 import dotenv from 'dotenv';
 import musicModel from './modules/musicModel.js';
 import userModel from './modules/userModule.js';
@@ -11,8 +12,9 @@ const sequelize = new Sequelize(
   process.env.DB_PASSWORD,
   {
     dialect: 'mysql',
+    dialectModule: mysql2,
     host: process.env.DB_HOST,
-    port: process.env.DB_PORT,
+    port: process.env.DB_PORT || 3306,
     dialectOptions: { decimalNumbers: true },
     logging: false,
   }
