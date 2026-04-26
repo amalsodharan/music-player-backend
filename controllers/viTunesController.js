@@ -1,6 +1,7 @@
 import YTMusic from 'ytmusic-api';
 import { Innertube, UniversalCache } from 'youtubei.js';
 import axios from 'axios';
+import youtubedl from 'youtube-dl-exec';
 
 // ─── Piped Instances (Fallback for blacklisted IPs like Render) ──────────────
 const PIPED_INSTANCES = [
@@ -8,7 +9,9 @@ const PIPED_INSTANCES = [
     'https://api.piped.victr.me',
     'https://pipedapi.tokhmi.xyz',
     'https://pipedapi.moomoo.me',
-    'https://pipedapi.leptons.xyz'
+    'https://pipedapi.leptons.xyz',
+    'https://pipedapi.adminforge.de',
+    'https://pipedapi.astartes.nl'
 ];
 
 async function getPipedStream(videoId) {
@@ -30,6 +33,41 @@ async function getPipedStream(videoId) {
         } catch (error) {
             console.error(`Piped instance ${base} failed:`, error.message);
         }
+    }
+    return null;
+}
+
+async function getYtdlStream(videoId) {
+    try {
+        const url = `https://www.youtube.com/watch?v=${videoId}`;
+        const output = await youtubedl(url, {
+            dumpSingleJson: true,
+            noCheckCertificates: true,
+            noWarnings: true,
+            preferFreeFormats: true,
+            extractorArgs: 'youtube:player_client=ios,android_vr',
+            addHeader: [
+                'referer:youtube.com',
+                'user-agent:googlebot'
+            ]
+        });
+        
+        const audioFormat = output.formats
+            .filter(f => f.vcodec === 'none' && f.url)
+            .sort((a, b) => (b.abr || 0) - (a.abr || 0))[0];
+
+        if (audioFormat) {
+            return {
+                url: audioFormat.url,
+                title: output.title,
+                uploader: output.uploader,
+                duration: output.duration,
+                thumbnail: output.thumbnail,
+                mimeType: audioFormat.acodec ? `audio/${audioFormat.ext}` : 'audio/mpeg'
+            };
+        }
+    } catch (error) {
+        console.error('yt-dlp fallback failed:', error.message);
     }
     return null;
 }
@@ -220,28 +258,41 @@ const getStreamUrl = async (req, res) => {
             const format = info.chooseFormat({ type: 'audio', quality: 'best' });
             
             if (format) {
-                // TV formats often don't need deciphering, or are easily handled
-                const audioUrl = format.decipher(yt.session.player);
-
-                return res.status(200).json({
-                    status: 'Success',
-                    data: {
-                        videoId: id,
-                        title: info.basic_info.title,
-                        author: info.basic_info.author,
-                        duration: info.basic_info.duration,
-                        thumbnail: info.basic_info.thumbnail?.[0]?.url,
-                        audioUrl: audioUrl,
-                        mimeType: format.mime_type,
-                        expiresIn: 3600
+                let audioUrl = format.url;
+                
+                // If there's a cipher but no URL, we might need to decipher
+                if (!audioUrl && format.signature_cipher) {
+                    try {
+                        await format.decipher(yt.session.player);
+                        audioUrl = format.url;
+                    } catch (decipherError) {
+                        console.warn('Deciphering failed:', decipherError.message);
                     }
-                });
+                }
+
+                if (audioUrl) {
+                    return res.status(200).json({
+                        status: 'Success',
+                        data: {
+                            videoId: id,
+                            title: info.basic_info.title,
+                            author: info.basic_info.author,
+                            duration: info.basic_info.duration,
+                            thumbnail: info.basic_info.thumbnail?.[0]?.url,
+                            audioUrl: audioUrl,
+                            mimeType: format.mime_type,
+                            expiresIn: 3600
+                        }
+                    });
+                } else {
+                    console.warn('No direct audio URL found in YouTubei format.');
+                }
             }
         } catch (error) {
             console.warn('Primary YouTubei fetch failed, trying Piped fallback...', error.message);
         }
 
-        // FALLBACK: Try Piped Instances
+        // FALLBACK 1: Try Piped Instances
         const pipedData = await getPipedStream(id);
         if (pipedData) {
             return res.status(200).json({
@@ -255,6 +306,26 @@ const getStreamUrl = async (req, res) => {
                     thumbnail: pipedData.thumbnail,
                     audioUrl: pipedData.url,
                     mimeType: pipedData.mimeType,
+                    expiresIn: 3600
+                }
+            });
+        }
+
+        // FALLBACK 2: Try yt-dlp (youtube-dl-exec)
+        console.log('Trying yt-dlp fallback for:', id);
+        const ytdlData = await getYtdlStream(id);
+        if (ytdlData) {
+            return res.status(200).json({
+                status: 'Success',
+                source: 'ytdl',
+                data: {
+                    videoId: id,
+                    title: ytdlData.title,
+                    author: ytdlData.uploader,
+                    duration: ytdlData.duration,
+                    thumbnail: ytdlData.thumbnail,
+                    audioUrl: ytdlData.url,
+                    mimeType: ytdlData.mimeType,
                     expiresIn: 3600
                 }
             });
@@ -308,13 +379,37 @@ const stream = async (req, res) => {
             console.warn('Direct YouTubei stream failed, trying Piped fallback...', error.message);
         }
 
-        // FALLBACK: Stream via Piped
+        // FALLBACK 1: Stream via Piped
         const pipedData = await getPipedStream(id);
         if (pipedData && pipedData.url) {
-            const response = await axios.get(pipedData.url, { responseType: 'stream' });
-            res.setHeader('Content-Type', pipedData.mimeType || 'audio/mpeg');
-            response.data.pipe(res);
-            return;
+            try {
+                const response = await axios.get(pipedData.url, { responseType: 'stream' });
+                res.setHeader('Content-Type', pipedData.mimeType || 'audio/mpeg');
+                response.data.pipe(res);
+                return;
+            } catch (pipedStreamError) {
+                console.warn('Piped stream connection failed:', pipedStreamError.message);
+            }
+        }
+
+        // FALLBACK 2: Stream via yt-dlp
+        try {
+            console.log('Trying yt-dlp stream fallback for:', id);
+            const ytdlData = await getYtdlStream(id);
+            if (ytdlData && ytdlData.url) {
+                const response = await axios.get(ytdlData.url, { 
+                    responseType: 'stream',
+                    headers: {
+                        'User-Agent': 'googlebot',
+                        'Referer': 'https://www.youtube.com/'
+                    }
+                });
+                res.setHeader('Content-Type', ytdlData.mimeType || 'audio/mpeg');
+                response.data.pipe(res);
+                return;
+            }
+        } catch (ytdlStreamError) {
+            console.error('yt-dlp stream fallback failed:', ytdlStreamError.message);
         }
 
         res.status(500).json({ status: 'Failed', message: 'Failed to stream from all sources' });

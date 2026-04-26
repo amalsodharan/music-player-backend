@@ -60,6 +60,10 @@ app.get('/api/viTune/stream/:id', viTunesController.stream);
 app.get('/api/saavn/search', saavnController.search);
 app.get('/api/saavn/streamUrl/:id', saavnController.getStreamUrl);
 
-app.listen(PORT, (req, res) => {
-    console.log(`Server is running on ${PORT}`);
-});
+if (process.env.NODE_ENV !== 'production') {
+    app.listen(PORT || 3000, () => {
+        console.log(`Server is running on ${PORT || 3000}`);
+    });
+}
+
+export default app;
