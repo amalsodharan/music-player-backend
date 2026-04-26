@@ -311,24 +311,60 @@ const getStreamUrl = async (req, res) => {
             });
         }
 
-        // FALLBACK 2: Try yt-dlp (youtube-dl-exec)
-        console.log('Trying yt-dlp fallback for:', id);
-        const ytdlData = await getYtdlStream(id);
-        if (ytdlData) {
-            return res.status(200).json({
-                status: 'Success',
-                source: 'ytdl',
-                data: {
-                    videoId: id,
-                    title: ytdlData.title,
-                    author: ytdlData.uploader,
-                    duration: ytdlData.duration,
-                    thumbnail: ytdlData.thumbnail,
-                    audioUrl: ytdlData.url,
-                    mimeType: ytdlData.mimeType,
-                    expiresIn: 3600
+        // FALLBACK 2: Try yt-dlp (youtube-dl-exec) - ONLY LOCALLY
+        if (process.env.NODE_ENV !== 'production') {
+            console.log('Trying yt-dlp fallback for:', id);
+            const ytdlData = await getYtdlStream(id);
+            if (ytdlData) {
+                return res.status(200).json({
+                    status: 'Success',
+                    source: 'ytdl',
+                    data: {
+                        videoId: id,
+                        title: ytdlData.title,
+                        author: ytdlData.uploader,
+                        duration: ytdlData.duration,
+                        thumbnail: ytdlData.thumbnail,
+                        audioUrl: ytdlData.url,
+                        mimeType: ytdlData.mimeType,
+                        expiresIn: 3600
+                    }
+                });
+            }
+        }
+
+        // FALLBACK 3: Try JioSaavn (Last resort for Vercel)
+        try {
+            const client = await getClient();
+            const songInfo = await client.getSong(id).catch(() => null);
+            const query = songInfo ? `${songInfo.title} ${songInfo.artist}` : id;
+            
+            console.log('Trying Saavn fallback for:', query);
+            const saavnResponse = await axios.get(`${req.protocol}://${req.get('host')}/api/saavn/search?query=${encodeURIComponent(query)}`);
+            
+            if (saavnResponse.data && saavnResponse.data.data && saavnResponse.data.data.length > 0) {
+                const bestMatch = saavnResponse.data.data[0];
+                const saavnStream = await axios.get(`${req.protocol}://${req.get('host')}/api/saavn/streamUrl/${bestMatch.id}`);
+                
+                if (saavnStream.data && saavnStream.data.data && saavnStream.data.data.audioUrl) {
+                    return res.status(200).json({
+                        status: 'Success',
+                        source: 'saavn',
+                        data: {
+                            videoId: id,
+                            title: bestMatch.title,
+                            author: bestMatch.artist,
+                            duration: bestMatch.duration,
+                            thumbnail: bestMatch.image?.[2]?.link || bestMatch.image?.[0]?.link,
+                            audioUrl: saavnStream.data.data.audioUrl,
+                            mimeType: 'audio/mp4',
+                            expiresIn: 3600
+                        }
+                    });
                 }
-            });
+            }
+        } catch (saavnError) {
+            console.error('Saavn fallback failed:', saavnError.message);
         }
 
         res.status(500).json({ status: 'Failed', message: 'Failed to get stream URL from all sources' });
@@ -392,24 +428,50 @@ const stream = async (req, res) => {
             }
         }
 
-        // FALLBACK 2: Stream via yt-dlp
-        try {
-            console.log('Trying yt-dlp stream fallback for:', id);
-            const ytdlData = await getYtdlStream(id);
-            if (ytdlData && ytdlData.url) {
-                const response = await axios.get(ytdlData.url, { 
-                    responseType: 'stream',
-                    headers: {
-                        'User-Agent': 'googlebot',
-                        'Referer': 'https://www.youtube.com/'
-                    }
-                });
-                res.setHeader('Content-Type', ytdlData.mimeType || 'audio/mpeg');
-                response.data.pipe(res);
-                return;
+        // FALLBACK 2: Stream via yt-dlp - ONLY LOCALLY
+        if (process.env.NODE_ENV !== 'production') {
+            try {
+                console.log('Trying yt-dlp stream fallback for:', id);
+                const ytdlData = await getYtdlStream(id);
+                if (ytdlData && ytdlData.url) {
+                    const response = await axios.get(ytdlData.url, { 
+                        responseType: 'stream',
+                        headers: {
+                            'User-Agent': 'googlebot',
+                            'Referer': 'https://www.youtube.com/'
+                        }
+                    });
+                    res.setHeader('Content-Type', ytdlData.mimeType || 'audio/mpeg');
+                    response.data.pipe(res);
+                    return;
+                }
+            } catch (ytdlStreamError) {
+                console.error('yt-dlp stream fallback failed:', ytdlStreamError.message);
             }
-        } catch (ytdlStreamError) {
-            console.error('yt-dlp stream fallback failed:', ytdlStreamError.message);
+        }
+
+        // FALLBACK 3: Stream via Saavn (Last resort for Vercel)
+        try {
+            const client = await getClient();
+            const songInfo = await client.getSong(id).catch(() => null);
+            const query = songInfo ? `${songInfo.title} ${songInfo.artist}` : id;
+            
+            console.log('Trying Saavn stream fallback for:', query);
+            const saavnResponse = await axios.get(`${req.protocol}://${req.get('host')}/api/saavn/search?query=${encodeURIComponent(query)}`);
+            
+            if (saavnResponse.data && saavnResponse.data.data && saavnResponse.data.data.length > 0) {
+                const bestMatch = saavnResponse.data.data[0];
+                const saavnStream = await axios.get(`${req.protocol}://${req.get('host')}/api/saavn/streamUrl/${bestMatch.id}`);
+                
+                if (saavnStream.data && saavnStream.data.data && saavnStream.data.data.audioUrl) {
+                    const streamResponse = await axios.get(saavnStream.data.data.audioUrl, { responseType: 'stream' });
+                    res.setHeader('Content-Type', 'audio/mp4');
+                    streamResponse.data.pipe(res);
+                    return;
+                }
+            }
+        } catch (saavnStreamError) {
+            console.error('Saavn stream fallback failed:', saavnStreamError.message);
         }
 
         res.status(500).json({ status: 'Failed', message: 'Failed to stream from all sources' });
