@@ -340,23 +340,27 @@ const getStreamUrl = async (req, res) => {
             const query = songInfo ? `${songInfo.title} ${songInfo.artist}` : id;
             
             console.log('Trying Saavn fallback for:', query);
-            const saavnResponse = await axios.get(`${req.protocol}://${req.get('host')}/api/saavn/search?query=${encodeURIComponent(query)}`);
+            const saavnSearch = await axios.get(`https://saavn.dev/api/search/songs`, {
+                params: { query, limit: 1 }
+            });
             
-            if (saavnResponse.data && saavnResponse.data.data && saavnResponse.data.data.length > 0) {
-                const bestMatch = saavnResponse.data.data[0];
-                const saavnStream = await axios.get(`${req.protocol}://${req.get('host')}/api/saavn/streamUrl/${bestMatch.id}`);
+            if (saavnSearch.data && saavnSearch.data.data && saavnSearch.data.data.results.length > 0) {
+                const bestMatch = saavnSearch.data.data.results[0];
+                const saavnStreamResponse = await axios.get(`https://saavn.dev/api/songs/${bestMatch.id}`);
+                const saavnStreamData = saavnStreamResponse.data.data[0];
                 
-                if (saavnStream.data && saavnStream.data.data && saavnStream.data.data.audioUrl) {
+                if (saavnStreamData && saavnStreamData.downloadUrl) {
+                    const audioUrl = saavnStreamData.downloadUrl[saavnStreamData.downloadUrl.length - 1].link;
                     return res.status(200).json({
                         status: 'Success',
                         source: 'saavn',
                         data: {
                             videoId: id,
-                            title: bestMatch.title,
-                            author: bestMatch.artist,
-                            duration: bestMatch.duration,
-                            thumbnail: bestMatch.image?.[2]?.link || bestMatch.image?.[0]?.link,
-                            audioUrl: saavnStream.data.data.audioUrl,
+                            title: saavnStreamData.name,
+                            author: saavnStreamData.artists.primary.map(a => a.name).join(', '),
+                            duration: saavnStreamData.duration,
+                            thumbnail: saavnStreamData.image[saavnStreamData.image.length - 1].link,
+                            audioUrl: audioUrl,
                             mimeType: 'audio/mp4',
                             expiresIn: 3600
                         }
@@ -457,14 +461,18 @@ const stream = async (req, res) => {
             const query = songInfo ? `${songInfo.title} ${songInfo.artist}` : id;
             
             console.log('Trying Saavn stream fallback for:', query);
-            const saavnResponse = await axios.get(`${req.protocol}://${req.get('host')}/api/saavn/search?query=${encodeURIComponent(query)}`);
+            const saavnSearch = await axios.get(`https://saavn.dev/api/search/songs`, {
+                params: { query, limit: 1 }
+            });
             
-            if (saavnResponse.data && saavnResponse.data.data && saavnResponse.data.data.length > 0) {
-                const bestMatch = saavnResponse.data.data[0];
-                const saavnStream = await axios.get(`${req.protocol}://${req.get('host')}/api/saavn/streamUrl/${bestMatch.id}`);
+            if (saavnSearch.data && saavnSearch.data.data && saavnSearch.data.data.results.length > 0) {
+                const bestMatch = saavnSearch.data.data.results[0];
+                const saavnStreamResponse = await axios.get(`https://saavn.dev/api/songs/${bestMatch.id}`);
+                const saavnStreamData = saavnStreamResponse.data.data[0];
                 
-                if (saavnStream.data && saavnStream.data.data && saavnStream.data.data.audioUrl) {
-                    const streamResponse = await axios.get(saavnStream.data.data.audioUrl, { responseType: 'stream' });
+                if (saavnStreamData && saavnStreamData.downloadUrl) {
+                    const audioUrl = saavnStreamData.downloadUrl[saavnStreamData.downloadUrl.length - 1].link;
+                    const streamResponse = await axios.get(audioUrl, { responseType: 'stream' });
                     res.setHeader('Content-Type', 'audio/mp4');
                     streamResponse.data.pipe(res);
                     return;
